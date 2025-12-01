@@ -1,5 +1,4 @@
 using Affinity.Deadletter.Agent;
-using Affinity.Deadletter.Agent.Agent;
 using Affinity.Deadletter.Agent.Plugins;
 using Affinity.Deadletter.Agent.Services;
 using Affinity.Deadletter.Agent.Services.Interfaces;
