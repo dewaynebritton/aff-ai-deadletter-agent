@@ -1,5 +1,6 @@
 ﻿namespace Affinity.Deadletter.Agent.Models;
 
-internal class AiAnaylsisResult
+public sealed class AiAnalysisResult
 {
+    public string SummaryMarkdown { get; set; } = default!;
 }

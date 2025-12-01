@@ -1,7 +1,6 @@
-﻿using System.ComponentModel;
-using Affinity.Deadletter.Agent.Models;
-using Affinity.Deadletter.Agent.Services.Interfaces;
+﻿using Affinity.Deadletter.Agent.Services.Interfaces;
 using Microsoft.SemanticKernel;
+using System.ComponentModel;
 
 namespace Affinity.Deadletter.Agent.Plugins;
 
@@ -15,18 +14,18 @@ public class DeadletterSqlPlugin
     }
 
     [KernelFunction]
-    [Description("Get up to 50 new unprocessed Service Bus deadletter records from the Affinity SQL table.")]
-    public async Task<IReadOnlyList<DeadletterRecord>> GetNewDeadlettersAsync()
+    [Description("Mark a Service Bus deadletter group as processed by correlation id and starting time.")]
+    public async Task MarkDeadletterGroupAsProcessedAsync(
+        [Description("The correlation id for the group.")] string correlationId,
+        [Description("ISO 8601 UTC timestamp indicating the earliest time to include.")] string sinceUtcIso)
     {
-        return await _repo.GetUnprocessedDeadlettersAsync();
-    }
+        if (!DateTime.TryParse(sinceUtcIso, out var since))
+        {
+            throw new ArgumentException("Invalid sinceUtcIso", nameof(sinceUtcIso));
+        }
 
-    [KernelFunction]
-    [Description("Mark a Service Bus deadletter record as processed by Id in the Affinity SQL table.")]
-    public async Task MarkDeadletterAsProcessedAsync(
-        [Description("The Id of the deadletter row.")] int id)
-    {
-        //await _repo.MarkAsProcessedAsync(id);
+        await _repo.MarkGroupAsProcessedAsync(correlationId, since, CancellationToken.None);
     }
 }
+
 

@@ -1,19 +1,33 @@
-﻿using Microsoft.SemanticKernel;
+﻿using Affinity.Deadletter.Agent.Models;
+using Affinity.Deadletter.Agent.Services;
+using Microsoft.SemanticKernel;
+using System.ComponentModel;
 
-namespace Affinity.Deadletter.Agent.Plugins;
+namespace Affinity.DeadletterAgent.Plugins;
+
 public class GitHubPlugin
 {
-    [KernelFunction("search_github_code")]
-    public Task<string> SearchAsync(string keywords)
+    private readonly IGitHubClient _github;
+
+    public GitHubPlugin(IGitHubClient github)
     {
-        // TODO: Call GitHub REST or GraphQL
-        return Task.FromResult("""
+        _github = github;
+    }
+
+    [KernelFunction]
+    [Description("Resolve the GitHub code context from an exception stack trace.")]
+    public Task<CodeContext?> ResolveCodeFromStackTraceAsync(
+        [Description("Full exception stack trace.")] string stackTrace)
+    {
+        var ex = new ExceptionInfo
         {
-            "Repo": "affinity/peo-utils",
-            "FilePath": "src/Email/SendCertEmail.cs",
-            "Line": 122,
-            "Snippet": "await _emailSender.SendCertificateAsync(...);"
-        }
-        """);
+            StackTrace = stackTrace,
+            OperationId = "N/A",
+            Type = "N/A",
+            Message = "N/A",
+            TimestampUtc = DateTime.UtcNow
+        };
+
+        return _github.ResolveCodeContextFromStackTraceAsync(ex);
     }
 }

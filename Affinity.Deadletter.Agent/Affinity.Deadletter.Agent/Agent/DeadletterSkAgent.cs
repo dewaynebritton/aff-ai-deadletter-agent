@@ -1,9 +1,11 @@
 ﻿using Affinity.Deadletter.Agent.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
+using System.Text.Json;
 
+namespace Affinity.DeadletterAgent.Agent;
 
-public class DeadletterSkAgent
+public sealed class DeadletterSkAgent
 {
     private readonly Kernel _kernel;
     private readonly ILogger<DeadletterSkAgent> _logger;
@@ -14,57 +16,75 @@ public class DeadletterSkAgent
         _logger = logger;
     }
 
-    public async Task RunForDeadletterAsync(DeadletterRecord dl, CancellationToken ct = default)
+    public async Task RunForCorrelationAsync(
+        string correlationId,
+        IReadOnlyList<DeadletterRecord> group,
+        DateTime windowStartUtc,
+        CancellationToken ct = default)
     {
-        //var planner = new StepwisePlanner(_kernel);
+        var first = group.MinBy(g => g.InsertedDateUtc)!;
+        var last = group.MaxBy(g => g.InsertedDateUtc)!;
 
         var goal = $@"
 You are an Affinity deadletter diagnostic agent.
 
-Investigate this Service Bus deadletter and notify the Affinity dev team with a concise summary and suggested fix.
+You are investigating a *group incident* for a correlation id that has failed multiple times.
 
-Deadletter:
-- Id: {dl.Id}
-- CustomCorrelationId: {dl.CustomCorrelationId}
-- InsertedDateUtc: {dl.InsertedDateUtc:o}
-- RawPayloadJson: {Truncate(dl.RawPayloadJson, 2000)}
+CorrelationId: {correlationId}
+Total deadletters in this incident: {group.Count}
+Time window: {first.InsertedDateUtc:o} - {last.InsertedDateUtc:o}
 
-You can:
-- Get traces by correlation id
-- Get exceptions by operation id
-- Resolve GitHub code context from stack trace
-- Notify developers via Teams
-- Mark deadletters as processed
+Your job:
 
-Plan:
-1. If correlation id exists, fetch latest trace.
-2. Use its operation id to fetch exception.
-3. Use exception stack trace to locate code in GitHub.
-4. Create a Markdown summary: root cause, likely fix, and any follow-up logging suggestions.
-5. Call notification tool to send summary.
-6. Mark the deadletter as processed.
-Stop when you are done.";
+1. Use tools to:
+   - Look up traces using the correlation id (AffinityCorrelationId in customDimensions).
+   - From traces, identify the most relevant operation_Id.
+   - Retrieve the exception for that operation_Id.
+   - Use the exception's stack trace to locate code in GitHub (file and line), if possible.
+2. Analyze the failure pattern (frequency, time window).
+3. Produce a Markdown incident summary that includes:
+   - Title and short summary
+   - Reproduction clues (inputs, timing, context)
+   - Likely root cause, including code location
+   - Suggested code fix or mitigation
+   - Any improvements to logging or telemetry.
+4. Call the notification tool exactly once with:
+   - A concise Markdown summary
+   - The incident correlation id
+   - The incident count
+   - A representative deadletter id.
+5. Optionally mark the deadletter group as processed, if it is safe to do so.
 
-        var args = new KernelArguments
+Think step-by-step and prefer using tools instead of guessing.
+";
+
+        // Enable auto function calling over all plugins
+        var settings = new PromptExecutionSettings
         {
-            ["deadletterId"] = dl.Id.ToString(),
-            ["deadletterCorrelationId"] = dl.CustomCorrelationId ?? string.Empty,
-            ["deadletterRawPayload"] = dl.RawPayloadJson ?? string.Empty
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
         };
 
-        _logger.LogInformation("Starting SK agent for deadletter Id={Id}", dl.Id);
+        var args = new KernelArguments(settings)
+        {
+            ["incidentCorrelationId"] = correlationId,
+            ["incidentCount"] = group.Count.ToString(),
+            ["incidentFirstSeen"] = first.InsertedDateUtc.ToString("o"),
+            ["incidentLastSeen"] = last.InsertedDateUtc.ToString("o"),
+            ["incidentWindowStartUtc"] = windowStartUtc.ToString("o"),
+            ["incidentDeadlettersJson"] = JsonSerializer.Serialize(group)
+        };
 
-        //var plan = await planner.CreatePlanAsync(goal);
-        //var result = await plan.InvokeAsync(_kernel, args, ct);
+        _logger.LogInformation(
+            "Starting SK agent for correlationId={CorrelationId} with {Count} deadletters.",
+            correlationId, group.Count);
 
-        //_logger.LogInformation("Agent completed for deadletter Id={Id}. Result: {Result}",
-        //    dl.Id, result.ToString());
-    }
+        var result = await _kernel.InvokePromptAsync(
+            goal,
+            args,
+            cancellationToken: ct);
 
-    private static string? Truncate(string? s, int max)
-    {
-        if (string.IsNullOrEmpty(s)) return s;
-        return s.Length <= max ? s : s[..max] + "...[truncated]";
+        _logger.LogInformation(
+            "Agent completed for correlationId={CorrelationId}. Final result: {Result}",
+            correlationId, result.ToString());
     }
 }
-

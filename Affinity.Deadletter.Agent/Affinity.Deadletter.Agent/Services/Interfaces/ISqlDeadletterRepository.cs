@@ -4,7 +4,14 @@ namespace Affinity.Deadletter.Agent.Services.Interfaces;
 
 public interface ISqlDeadletterRepository
 {
-    Task<IReadOnlyList<DeadletterRecord>> GetUnprocessedDeadlettersAsync(CancellationToken ct = default);
-    //Task MarkAsProcessedAsync(int id, CancellationToken ct = default);
+    Task<IReadOnlyList<DeadletterRecord>> GetUnprocessedDeadlettersSinceAsync(
+        DateTime sinceUtc,
+        CancellationToken ct = default);
+
+    Task MarkGroupAsProcessedAsync(
+        string correlationId,
+        DateTime sinceUtc,
+        CancellationToken ct = default);
 }
+
 

@@ -2,8 +2,9 @@ using Affinity.Deadletter.Agent;
 using Affinity.Deadletter.Agent.Plugins;
 using Affinity.Deadletter.Agent.Services;
 using Affinity.Deadletter.Agent.Services.Interfaces;
-using Azure.Core;
-using Azure.Identity;
+using Affinity.DeadletterAgent.Agent;
+using Affinity.DeadletterAgent.Function;
+using Affinity.DeadletterAgent.Plugins;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.Configuration;
@@ -38,11 +39,23 @@ builder.Services.AddSingleton<Kernel>(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
 
+    // Azure OpenAI config
+    var endpoint = config["AzureOpenAI:Endpoint"]
+        ?? throw new InvalidOperationException("AzureOpenAI:Endpoint not configured.");
+    var deploymentName = config["AzureOpenAI:DeploymentName"]
+        ?? throw new InvalidOperationException("AzureOpenAI:DeploymentName not configured.");
+    var apiKey = config["AzureOpenAI:ApiKey"]
+        ?? throw new InvalidOperationException("AzureOpenAI:ApiKey not configured.");
+
     var kernel = Kernel.CreateBuilder();
+
+    // Add Azure OpenAI chat completion service to the kernel
+    // Overload from docs:
+    // builder.AddAzureOpenAIChatCompletion(deploymentName, apiKey, endpoint, modelId: null, serviceId: null, httpClient: null); :contentReference[oaicite:0]{index=0}
     kernel.AddAzureOpenAIChatCompletion(
-        deploymentName: config["AzureOpenAI:Deployment"],
-        endpoint: config["AzureOpenAI:Endpoint"],
-        apiKey: config["AzureOpenAI:ApiKey"]);
+        deploymentName: deploymentName,
+        endpoint: endpoint,
+        apiKey: apiKey);
 
     // Logging + HTTP from host DI
     kernel.Services.AddLogging();
@@ -57,14 +70,12 @@ builder.Services.AddSingleton<Kernel>(sp =>
     var notifier = sp.GetRequiredService<INotificationClient>();
 
     builtKernel.Plugins.AddFromObject(new DeadletterSqlPlugin(sql), "DeadletterSql");
-    //builtKernel.Plugins.AddFromObject(new AppInsightsPlugin(ai), "AppInsights");
-    //builtKernel.Plugins.AddFromObject(new GitHubPlugin(github), "GitHub");
-    //builtKernel.Plugins.AddFromObject(new NotificationPlugin(notifier), "Notify");
+    builtKernel.Plugins.AddFromObject(new AppInsightsPlugin(ai), "AppInsights");
+    builtKernel.Plugins.AddFromObject(new GitHubPlugin(github), "GitHub");
+    builtKernel.Plugins.AddFromObject(new NotificationPlugin(notifier), "Notify");
 
     return builtKernel;
 });
-
-builder.Services.AddSingleton<TokenCredential, DefaultAzureCredential>();
 
 // Agent orchestrator
 builder.Services.AddSingleton<DeadletterSkAgent>();

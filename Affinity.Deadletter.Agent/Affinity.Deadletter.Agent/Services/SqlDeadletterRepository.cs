@@ -3,9 +3,11 @@ using Affinity.Deadletter.Agent.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Data;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
+
 
 namespace Affinity.Deadletter.Agent.Services;
+
 
 public sealed class SqlDeadletterRepository : ISqlDeadletterRepository
 {
@@ -19,54 +21,65 @@ public sealed class SqlDeadletterRepository : ISqlDeadletterRepository
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<DeadletterRecord>> GetUnprocessedDeadlettersAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<DeadletterRecord>> GetUnprocessedDeadlettersSinceAsync(
+        DateTime sinceUtc,
+        CancellationToken ct = default)
     {
-        var results = new List<DeadletterRecord>();
-
         const string sql = @"
-            SELECT TOP (50)
-                Id,
-                CustomCorrelationId,
-                InsertedDateUtc,
-                RawPayloadJson
+            SELECT Id,
+                   CustomCorrelationId,
+                   InsertedDateUtc,
+                   RawPayloadJson
             FROM dbo.ServiceBusDeadletters
             WHERE ProcessedFlag = 0
+              AND InsertedDateUtc >= @SinceUtc
             ORDER BY InsertedDateUtc;";
 
-        //await using var conn = new SqlConnection(_connectionString);
-        //await conn.OpenAsync(ct);
+        var results = new List<DeadletterRecord>();
 
-        //await using var cmd = new SqlCommand(sql, conn);
-        //await using var reader = await cmd.ExecuteReaderAsync(ct);
+        await using var conn = new SqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
 
-        //while (await reader.ReadAsync(ct))
-        //{
-        //    results.Add(new DeadletterRecord
-        //    {
-        //        Id = reader.GetInt32(0),
-        //        CustomCorrelationId = reader.IsDBNull(1) ? null : reader.GetString(1),
-        //        InsertedDateUtc = reader.GetDateTime(2),
-        //        RawPayloadJson = reader.IsDBNull(3) ? null : reader.GetString(3)
-        //    });
-        //}
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.Add(new SqlParameter("@SinceUtc", SqlDbType.DateTime2) { Value = sinceUtc });
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            results.Add(new DeadletterRecord
+            {
+                Id = reader.GetInt32(0),
+                CustomCorrelationId = reader.IsDBNull(1) ? null : reader.GetString(1),
+                InsertedDateUtc = reader.GetDateTime(2),
+                RawPayloadJson = reader.IsDBNull(3) ? null : reader.GetString(3)
+            });
+        }
 
         return results;
     }
 
-    //public async Task MarkAsProcessedAsync(int id, CancellationToken ct = default)
-    //{
-    //    const string sql = @"
-    //        UPDATE dbo.ServiceBusDeadletters
-    //        SET ProcessedFlag = 1,
-    //            ProcessedDateUtc = SYSUTCDATETIME()
-    //        WHERE Id = @Id;";
+    public async Task MarkGroupAsProcessedAsync(
+        string correlationId,
+        DateTime sinceUtc,
+        CancellationToken ct = default)
+    {
+        const string sql = @"
+            UPDATE dbo.ServiceBusDeadletters
+            SET ProcessedFlag = 1,
+                ProcessedDateUtc = SYSUTCDATETIME()
+            WHERE ProcessedFlag = 0
+              AND CustomCorrelationId = @CorrelationId
+              AND InsertedDateUtc >= @SinceUtc;";
 
-    //    await using var conn = new SqlConnection(_connectionString);
-    //    await conn.OpenAsync(ct);
+        await using var conn = new SqlConnection(_connectionString);
+        await conn.OpenAsync(ct);
 
-    //    await using var cmd = new SqlCommand(sql, conn);
-    //    cmd.Parameters.AddWithValue("@Id", id);
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@CorrelationId", correlationId);
+        cmd.Parameters.Add(new SqlParameter("@SinceUtc", SqlDbType.DateTime2) { Value = sinceUtc });
 
-    //    await cmd.ExecuteNonQueryAsync(ct);
-    //}
+        var rows = await cmd.ExecuteNonQueryAsync(ct);
+        _logger.LogInformation("Marked {RowCount} rows as processed for CorrelationId={CorrelationId}", rows, correlationId);
+    }
 }
+
