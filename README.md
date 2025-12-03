@@ -308,7 +308,7 @@ sequenceDiagram
 
 # Semantic Kernel Workflow w/Agent Solution
 
-Simplier more deterministic approach.
+Simplier more deterministic approach, but really does not take advantage of Semantic Kernel or Agent's capabilities.
 
 ## Workflow w/Agent Design
 
