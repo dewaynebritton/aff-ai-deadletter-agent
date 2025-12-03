@@ -1,8 +1,8 @@
-# AI Mission Presentation
+# Semantic Kernel Full Agent Solution
 
 ## Problem being solved
 
-For each PEO deadletter, what was the root problem, where did it happen, and what is the recommended fix. This involves multiple pieces working together:
+For each PEO deadletter, what is the root problem, where did it happen, and what is the recommended fix. This involves multiple pieces working together:
 
 	* AI Agent accessing:
 	* SQL Database
@@ -12,7 +12,8 @@ For each PEO deadletter, what was the root problem, where did it happen, and wha
 
 ### Solution Process
 
-The function that throws the deadletter could be caused by an Affinity API it calls. 
+The function that throws the deadletter could be caused by a deeper process than the function that threw the dead letter. For example, an Affinity API 
+the function calls could have thrown the original exception. A developer might perform the following steps to find a solution.
 
 	* Identify the repo for the deadletter
 	* Identify the App from the repo
@@ -38,11 +39,13 @@ LLMs, etc.
 		- Automatically handles many of the low level details like queries, etc.
 	- Cons
 		- Cannot be implemented in code
+		- Cannot be version controlled
 * Semantic Kernel
 	- Pros
 		- Implements in a function
 		- Very Flexible
 		- Illustrates how to implement agent in code
+		- Can be version controlled
 	- Cons
 		- Have to handle memory
 		- Have to handle all the details, i.e. connections to GitHub, AppInsights, etc.
@@ -61,15 +64,24 @@ LLMs, etc.
 	
 ## Learnings
 
-	* Copilot Instructions filess
+	* Copilot Instructions files
 	* Logging Standards needed
 	* Use of Correlation Ids
 		- Fortunately, due to some Lee put in place, was able to use these for PEO
 	
-## Mission Status 
+## AI Mission Status 
 
 Where things stand based on the time spent so far. Most of my time was spent on research, with a little spent on building Semantic Kernel Frameworks, 
 but no working POC yet.
+
+## Proposal
+
+Still lacking understanding of the Azure AI Foundary. But that is being understood my others. So proposing that the Semantic Kernal Full Agent approach be
+implemented for the following reasons:
+
+	* Gain understanding in how to embed agents in AFfinity's code
+	* Be able to track the various versions of this process 
+	* Gain deeper insights in how to develop our applications (ex. logging)
 
 ## Full Agent Design Diagrams
 
@@ -297,6 +309,10 @@ sequenceDiagram
     LLM-->>Kernel: Final LLM message<br/>(FunctionResult content)
     Kernel-->>Agent: FunctionResult returned
 ```
+
+# Semantic Kernel Workflow w/Agent Solution
+
+Simplier more deterministic approach.
 
 ## Workflow w/Agent Design
 
