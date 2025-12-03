@@ -76,14 +76,16 @@ but no working POC yet.
 
 ## Proposal
 
-Still lacking understanding of the Azure AI Foundary. But that is being understood my others. So proposing that the Semantic Kernal Full Agent approach be
-implemented for the following reasons:
+Because I am still lacking understanding of the Azure AI Foundary, but other are working on understanding. Proposing that the Semantic Kernal Full Agent 
+approach be implemented for the following reasons:
 
-	* Gain understanding in how to embed agents in AFfinity's code
+	* Gain understanding in how to embed agents in AFfinity's code base with greater control
 	* Be able to track the various versions of this process 
-	* Gain deeper insights in how to develop our applications (ex. logging)
+	* Gain deeper insights in how to develop our applications (ex. logging, etc.)
 
 ## Full Agent Design Diagrams
+
+The design for the current version of the Semantic Kernel Full Agent Framework are illustrated in the following diagrams.
 
 ### Data Flow
 
