@@ -170,12 +170,6 @@ flowchart TD
 
     LLM -->|Optional Tool Call<br/>Mark Group Processed| P_SQL
     P_SQL --> DLQ
-
-    %% Completion
-    LLM --> KERNEL
-    KERNEL --> AGENT
-    AGENT --> FUNC
-    FUNC --> TMR
 ```
 
 ### Sequence Diagrams
